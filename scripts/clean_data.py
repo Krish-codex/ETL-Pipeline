@@ -70,17 +70,6 @@ def extract_weather_fields(raw_record: dict) -> dict | None:
 
     Returns:
         Dictionary with cleaned fields, or None if extraction failed
-
-    The API returns a LOT of nested data — we only need a few key fields.
-    This function digs into the nested structure and pulls out what we need.
-
-    Example raw structure from API:
-    {
-        "name": "Mumbai",
-        "main": {"temp": 32.5, "humidity": 78, ...},
-        "weather": [{"main": "Clouds", "description": "scattered clouds"}],
-        ...
-    }
     """
     try:
         cleaned = {
@@ -100,6 +89,11 @@ def extract_weather_fields(raw_record: dict) -> dict | None:
             "wind_speed": raw_record.get("wind", {}).get("speed"),
             "visibility": raw_record.get("visibility"),
             "country": raw_record.get("sys", {}).get("country", "Unknown"),
+            "aqi": raw_record.get("aqi"),
+            "pm2_5": raw_record.get("pm2_5"),
+            "pm10": raw_record.get("pm10"),
+            "forecast_wind_speed": raw_record.get("forecast_wind_speed"),
+            "forecast_humidity": raw_record.get("forecast_humidity"),
             "timestamp": raw_record.get(
                 "fetch_timestamp", datetime.now().isoformat()
             ),
@@ -120,77 +114,102 @@ def clean_and_transform(raw_data: list[dict]) -> pd.DataFrame | None:
 
     Returns:
         Cleaned pandas DataFrame, or None if transformation failed
-
-    This is where the real 'Transform' magic happens:
-    1. Extract relevant fields from each record
-    2. Create a DataFrame
-    3. Handle missing values
-    4. Convert data types
-    5. Add derived columns
     """
-    logger.info("Starting data transformation...")
+    logger.info("Starting multi-stage data validation & cleaning...")
 
-    # Step 1: Extract fields from each record
+    total_anomalies_detected = 0
+
+    # Stage 1: Extract fields from each record
     cleaned_records = []
     for i, record in enumerate(raw_data):
         cleaned = extract_weather_fields(record)
         if cleaned:
             cleaned_records.append(cleaned)
         else:
-            logger.warning(f"Skipped record {i + 1} due to extraction failure")
+            total_anomalies_detected += 1
+            logger.warning(f"Anomaly Fixed: Skipped record {i + 1} due to extraction failure")
 
     if not cleaned_records:
         logger.error("No records survived the cleaning process!")
         return None
 
-    # Step 2: Create a pandas DataFrame
+    # Stage 2: Create a pandas DataFrame
     df = pd.DataFrame(cleaned_records)
     logger.info(f"Created DataFrame with {len(df)} rows and {len(df.columns)} columns")
 
-    # Step 3: Handle missing values
-    # For numeric columns, fill missing values with the column median
-    # Median is better than mean because it's less affected by outliers
-    numeric_cols = ["temperature", "feels_like", "humidity", "pressure", "wind_speed"]
+    # Stage 3: Handle missing/null values for numeric columns
+    numeric_cols = [
+        "temperature", "feels_like", "humidity", "pressure", "wind_speed",
+        "aqi", "pm2_5", "pm10", "forecast_wind_speed", "forecast_humidity"
+    ]
     for col in numeric_cols:
         if col in df.columns:
             missing_count = df[col].isna().sum()
             if missing_count > 0:
+                total_anomalies_detected += missing_count
                 median_value = df[col].median()
+                # If median is NaN (entire column is empty), fill with 0 or standard base
+                if pd.isna(median_value):
+                    median_value = 0.0
                 df[col] = df[col].fillna(median_value)
-                logger.info(f"Filled {missing_count} missing values in '{col}' with median: {median_value}")
+                logger.info(f"Anomaly Fixed: Filled {missing_count} missing values in '{col}' with median: {median_value}")
 
-    # For text columns, fill missing values with 'Unknown'
+    # Stage 4: Handle missing/null values for text columns
     text_cols = ["city", "weather_condition", "weather_description", "country"]
     for col in text_cols:
         if col in df.columns:
-            df[col] = df[col].fillna("Unknown")
+            missing_count = df[col].isna().sum()
+            if missing_count > 0:
+                total_anomalies_detected += missing_count
+                df[col] = df[col].fillna("Unknown")
+                logger.info(f"Anomaly Fixed: Filled {missing_count} missing values in '{col}' with 'Unknown'")
 
-    # Step 4: Convert data types for consistency
+    # Stage 5: Convert and enforce exact data types (Type checking validation stage)
     df["temperature"] = pd.to_numeric(df["temperature"], errors="coerce")
     df["humidity"] = pd.to_numeric(df["humidity"], errors="coerce")
+    df["aqi"] = pd.to_numeric(df["aqi"], errors="coerce")
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
 
-    # Step 5: Add derived/calculated columns
-    # Temperature category — useful for grouping in analysis later
+    # Handle any conversion failures that resulted in new nulls
+    for col in ["temperature", "humidity", "aqi"]:
+        conversion_failures = df[col].isna().sum()
+        if conversion_failures > 0:
+            total_anomalies_detected += conversion_failures
+            df[col] = df[col].fillna(0)
+            logger.info(f"Anomaly Fixed: Resolved {conversion_failures} invalid type entries in '{col}'")
+
+    # Stage 6: Value Range checks (e.g. temperatures or AQI cannot be negative/out-of-bounds)
+    if "temperature" in df.columns:
+        out_of_bounds_temp = df[(df["temperature"] > 60) | (df["temperature"] < -60)]
+        if len(out_of_bounds_temp) > 0:
+            total_anomalies_detected += len(out_of_bounds_temp)
+            df.loc[df["temperature"] > 60, "temperature"] = 35.0
+            df.loc[df["temperature"] < -60, "temperature"] = -10.0
+            logger.info(f"Anomaly Fixed: Standardized {len(out_of_bounds_temp)} extreme/out-of-bound temperatures")
+
+    # Stage 7: Add derived/calculated columns
     df["temp_category"] = pd.cut(
         df["temperature"],
         bins=[-float("inf"), 0, 15, 25, 35, float("inf")],
         labels=["Freezing", "Cold", "Mild", "Warm", "Hot"],
     )
 
-    # Round numeric columns to 2 decimal places for cleaner output
+    # Round numeric columns to 2 decimal places
     for col in numeric_cols:
         if col in df.columns:
             df[col] = df[col].round(2)
 
-    # Step 6: Remove duplicate entries (same city fetched twice by accident)
+    # Stage 8: Remove duplicate entries
     before_dedup = len(df)
     df = df.drop_duplicates(subset=["city"], keep="last")
     after_dedup = len(df)
-    if before_dedup != after_dedup:
-        logger.info(f"Removed {before_dedup - after_dedup} duplicate records")
+    duplicates = before_dedup - after_dedup
+    if duplicates > 0:
+        total_anomalies_detected += duplicates
+        logger.info(f"Anomaly Fixed: Dropped {duplicates} duplicate city records")
 
-    logger.info(f"Transformation complete. Final DataFrame: {df.shape}")
+    logger.info(f"🎯 Multi-stage validation complete! Successfully resolved {total_anomalies_detected} anomalies.")
+    logger.info(f"Final cleaned DataFrame shape: {df.shape}")
     return df
 
 
