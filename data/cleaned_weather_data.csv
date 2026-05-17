@@ -1,11 +1,11 @@
-city,temperature,feels_like,temp_min,temp_max,humidity,pressure,weather_condition,weather_description,wind_speed,visibility,country,timestamp,temp_category
-Mumbai,31.05,31.15,29.05,33.05,83,1005,Rain,moderate rain,5.42,9475,IN,2026-05-17 13:21:33.545048,Warm
-Delhi,37.9,37.8,35.9,39.9,37,1012,Haze,haze,4.1,9764,IN,2026-05-17 13:21:33.545048,Hot
-London,17.9,18.0,15.9,19.9,78,1025,Clouds,broken clouds,6.9,9629,GB,2026-05-17 13:21:33.546589,Mild
-New York,19.53,19.43,17.53,21.53,70,1014,Clear,clear sky,5.4,8919,US,2026-05-17 13:21:33.546589,Mild
-Tokyo,18.48,18.38,16.48,20.48,62,1014,Clouds,scattered clouds,4.92,9137,JP,2026-05-17 13:21:33.546589,Mild
-Sydney,15.24,15.34,13.24,17.24,73,1022,Clear,clear sky,7.46,8858,AU,2026-05-17 13:21:33.546589,Mild
-Dubai,39.25,39.15,37.25,41.25,39,1024,Clear,clear sky,2.03,9317,AE,2026-05-17 13:21:33.546589,Hot
-Paris,14.77,14.67,12.77,16.77,63,1013,Mist,mist,1.93,9035,FR,2026-05-17 13:21:33.546589,Cold
-Berlin,15.06,14.96,13.06,17.06,66,1025,Clouds,few clouds,1.98,8496,DE,2026-05-17 13:21:33.546589,Mild
-Toronto,12.75,12.65,10.75,14.75,65,1011,Clear,clear sky,5.83,9358,CA,2026-05-17 13:21:33.546589,Cold
+city,temperature,feels_like,temp_min,temp_max,humidity,pressure,weather_condition,weather_description,wind_speed,visibility,country,aqi,pm2_5,pm10,forecast_wind_speed,forecast_humidity,timestamp,temp_category
+Mumbai,29.15,29.25,27.15,31.15,71,1020,Rain,moderate rain,5.53,8157,IN,109,18.17,24.38,6.86,74,2026-05-17 14:17:54.881807,Warm
+Delhi,37.85,37.75,35.85,39.85,44,1020,Haze,haze,8.0,8121,IN,38,9.57,8.97,6.21,43,2026-05-17 14:17:54.881807,Hot
+London,12.99,13.09,10.99,14.99,83,1022,Clouds,broken clouds,4.76,8930,GB,68,6.92,31.06,6.63,85,2026-05-17 14:17:54.881807,Cold
+New York,21.63,21.53,19.63,23.63,54,1020,Clear,clear sky,6.55,8291,US,78,19.36,22.71,4.06,55,2026-05-17 14:17:54.881807,Mild
+Tokyo,19.59,19.49,17.59,21.59,68,1017,Clouds,scattered clouds,5.56,9780,JP,70,11.83,27.74,1.96,71,2026-05-17 14:17:54.881807,Mild
+Sydney,15.58,15.68,13.58,17.58,77,1020,Clear,clear sky,3.06,9396,AU,103,10.36,39.18,3.68,81,2026-05-17 14:17:54.881807,Mild
+Dubai,37.3,37.2,35.3,39.3,26,1017,Clear,clear sky,3.72,8251,AE,21,2.52,6.92,8.03,23,2026-05-17 14:17:54.881807,Hot
+Paris,18.01,18.11,16.01,20.01,73,1024,Mist,mist,4.14,9709,FR,78,9.02,21.8,6.77,76,2026-05-17 14:17:54.881807,Mild
+Berlin,15.04,14.94,13.04,17.04,63,1025,Clouds,few clouds,3.93,8918,DE,31,4.36,11.95,9.1,59,2026-05-17 14:17:54.881807,Mild
+Toronto,14.04,13.94,12.04,16.04,62,1008,Clear,clear sky,6.8,9029,CA,26,6.44,8.74,9.61,64,2026-05-17 14:17:54.881807,Cold

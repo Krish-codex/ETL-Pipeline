@@ -2,12 +2,12 @@
     {
         "name": "Mumbai",
         "main": {
-            "temp": 31.05,
-            "feels_like": 31.15,
-            "temp_min": 29.05,
-            "temp_max": 33.05,
-            "humidity": 83,
-            "pressure": 1005
+            "temp": 29.15,
+            "feels_like": 29.25,
+            "temp_min": 27.15,
+            "temp_max": 31.15,
+            "humidity": 71,
+            "pressure": 1020
         },
         "weather": [
             {
@@ -16,23 +16,28 @@
             }
         ],
         "wind": {
-            "speed": 5.42
+            "speed": 5.53
         },
-        "visibility": 9475,
+        "visibility": 8157,
         "sys": {
             "country": "IN"
         },
-        "fetch_timestamp": "2026-05-17T13:21:33.545048"
+        "aqi": 109,
+        "pm2_5": 18.17,
+        "pm10": 24.38,
+        "forecast_wind_speed": 6.86,
+        "forecast_humidity": 74,
+        "fetch_timestamp": "2026-05-17T14:17:54.881807"
     },
     {
         "name": "Delhi",
         "main": {
-            "temp": 37.9,
-            "feels_like": 37.8,
-            "temp_min": 35.9,
-            "temp_max": 39.9,
-            "humidity": 37,
-            "pressure": 1012
+            "temp": 37.85,
+            "feels_like": 37.75,
+            "temp_min": 35.85,
+            "temp_max": 39.85,
+            "humidity": 44,
+            "pressure": 1020
         },
         "weather": [
             {
@@ -41,23 +46,28 @@
             }
         ],
         "wind": {
-            "speed": 4.1
+            "speed": 8.0
         },
-        "visibility": 9764,
+        "visibility": 8121,
         "sys": {
             "country": "IN"
         },
-        "fetch_timestamp": "2026-05-17T13:21:33.545048"
+        "aqi": 38,
+        "pm2_5": 9.57,
+        "pm10": 8.97,
+        "forecast_wind_speed": 6.21,
+        "forecast_humidity": 43,
+        "fetch_timestamp": "2026-05-17T14:17:54.881807"
     },
     {
         "name": "London",
         "main": {
-            "temp": 17.9,
-            "feels_like": 18.0,
-            "temp_min": 15.9,
-            "temp_max": 19.9,
-            "humidity": 78,
-            "pressure": 1025
+            "temp": 12.99,
+            "feels_like": 13.09,
+            "temp_min": 10.99,
+            "temp_max": 14.99,
+            "humidity": 83,
+            "pressure": 1022
         },
         "weather": [
             {
@@ -66,23 +76,28 @@
             }
         ],
         "wind": {
-            "speed": 6.9
+            "speed": 4.76
         },
-        "visibility": 9629,
+        "visibility": 8930,
         "sys": {
             "country": "GB"
         },
-        "fetch_timestamp": "2026-05-17T13:21:33.546589"
+        "aqi": 68,
+        "pm2_5": 6.92,
+        "pm10": 31.06,
+        "forecast_wind_speed": 6.63,
+        "forecast_humidity": 85,
+        "fetch_timestamp": "2026-05-17T14:17:54.881807"
     },
     {
         "name": "New York",
         "main": {
-            "temp": 19.53,
-            "feels_like": 19.43,
-            "temp_min": 17.53,
-            "temp_max": 21.53,
-            "humidity": 70,
-            "pressure": 1014
+            "temp": 21.63,
+            "feels_like": 21.53,
+            "temp_min": 19.63,
+            "temp_max": 23.63,
+            "humidity": 54,
+            "pressure": 1020
         },
         "weather": [
             {
@@ -91,23 +106,28 @@
             }
         ],
         "wind": {
-            "speed": 5.4
+            "speed": 6.55
         },
-        "visibility": 8919,
+        "visibility": 8291,
         "sys": {
             "country": "US"
         },
-        "fetch_timestamp": "2026-05-17T13:21:33.546589"
+        "aqi": 78,
+        "pm2_5": 19.36,
+        "pm10": 22.71,
+        "forecast_wind_speed": 4.06,
+        "forecast_humidity": 55,
+        "fetch_timestamp": "2026-05-17T14:17:54.881807"
     },
     {
         "name": "Tokyo",
         "main": {
-            "temp": 18.48,
-            "feels_like": 18.38,
-            "temp_min": 16.48,
-            "temp_max": 20.48,
-            "humidity": 62,
-            "pressure": 1014
+            "temp": 19.59,
+            "feels_like": 19.49,
+            "temp_min": 17.59,
+            "temp_max": 21.59,
+            "humidity": 68,
+            "pressure": 1017
         },
         "weather": [
             {
@@ -116,23 +136,28 @@
             }
         ],
         "wind": {
-            "speed": 4.92
+            "speed": 5.56
         },
-        "visibility": 9137,
+        "visibility": 9780,
         "sys": {
             "country": "JP"
         },
-        "fetch_timestamp": "2026-05-17T13:21:33.546589"
+        "aqi": 70,
+        "pm2_5": 11.83,
+        "pm10": 27.74,
+        "forecast_wind_speed": 1.96,
+        "forecast_humidity": 71,
+        "fetch_timestamp": "2026-05-17T14:17:54.881807"
     },
     {
         "name": "Sydney",
         "main": {
-            "temp": 15.24,
-            "feels_like": 15.34,
-            "temp_min": 13.24,
-            "temp_max": 17.24,
-            "humidity": 73,
-            "pressure": 1022
+            "temp": 15.58,
+            "feels_like": 15.68,
+            "temp_min": 13.58,
+            "temp_max": 17.58,
+            "humidity": 77,
+            "pressure": 1020
         },
         "weather": [
             {
@@ -141,23 +166,28 @@
             }
         ],
         "wind": {
-            "speed": 7.46
+            "speed": 3.06
         },
-        "visibility": 8858,
+        "visibility": 9396,
         "sys": {
             "country": "AU"
         },
-        "fetch_timestamp": "2026-05-17T13:21:33.546589"
+        "aqi": 103,
+        "pm2_5": 10.36,
+        "pm10": 39.18,
+        "forecast_wind_speed": 3.68,
+        "forecast_humidity": 81,
+        "fetch_timestamp": "2026-05-17T14:17:54.881807"
     },
     {
         "name": "Dubai",
         "main": {
-            "temp": 39.25,
-            "feels_like": 39.15,
-            "temp_min": 37.25,
-            "temp_max": 41.25,
-            "humidity": 39,
-            "pressure": 1024
+            "temp": 37.3,
+            "feels_like": 37.2,
+            "temp_min": 35.3,
+            "temp_max": 39.3,
+            "humidity": 26,
+            "pressure": 1017
         },
         "weather": [
             {
@@ -166,23 +196,28 @@
             }
         ],
         "wind": {
-            "speed": 2.03
+            "speed": 3.72
         },
-        "visibility": 9317,
+        "visibility": 8251,
         "sys": {
             "country": "AE"
         },
-        "fetch_timestamp": "2026-05-17T13:21:33.546589"
+        "aqi": 21,
+        "pm2_5": 2.52,
+        "pm10": 6.92,
+        "forecast_wind_speed": 8.03,
+        "forecast_humidity": 23,
+        "fetch_timestamp": "2026-05-17T14:17:54.881807"
     },
     {
         "name": "Paris",
         "main": {
-            "temp": 14.77,
-            "feels_like": 14.67,
-            "temp_min": 12.77,
-            "temp_max": 16.77,
-            "humidity": 63,
-            "pressure": 1013
+            "temp": 18.01,
+            "feels_like": 18.11,
+            "temp_min": 16.01,
+            "temp_max": 20.01,
+            "humidity": 73,
+            "pressure": 1024
         },
         "weather": [
             {
@@ -191,22 +226,27 @@
             }
         ],
         "wind": {
-            "speed": 1.93
+            "speed": 4.14
         },
-        "visibility": 9035,
+        "visibility": 9709,
         "sys": {
             "country": "FR"
         },
-        "fetch_timestamp": "2026-05-17T13:21:33.546589"
+        "aqi": 78,
+        "pm2_5": 9.02,
+        "pm10": 21.8,
+        "forecast_wind_speed": 6.77,
+        "forecast_humidity": 76,
+        "fetch_timestamp": "2026-05-17T14:17:54.881807"
     },
     {
         "name": "Berlin",
         "main": {
-            "temp": 15.06,
-            "feels_like": 14.96,
-            "temp_min": 13.06,
-            "temp_max": 17.06,
-            "humidity": 66,
+            "temp": 15.04,
+            "feels_like": 14.94,
+            "temp_min": 13.04,
+            "temp_max": 17.04,
+            "humidity": 63,
             "pressure": 1025
         },
         "weather": [
@@ -216,23 +256,28 @@
             }
         ],
         "wind": {
-            "speed": 1.98
+            "speed": 3.93
         },
-        "visibility": 8496,
+        "visibility": 8918,
         "sys": {
             "country": "DE"
         },
-        "fetch_timestamp": "2026-05-17T13:21:33.546589"
+        "aqi": 31,
+        "pm2_5": 4.36,
+        "pm10": 11.95,
+        "forecast_wind_speed": 9.1,
+        "forecast_humidity": 59,
+        "fetch_timestamp": "2026-05-17T14:17:54.881807"
     },
     {
         "name": "Toronto",
         "main": {
-            "temp": 12.75,
-            "feels_like": 12.65,
-            "temp_min": 10.75,
-            "temp_max": 14.75,
-            "humidity": 65,
-            "pressure": 1011
+            "temp": 14.04,
+            "feels_like": 13.94,
+            "temp_min": 12.04,
+            "temp_max": 16.04,
+            "humidity": 62,
+            "pressure": 1008
         },
         "weather": [
             {
@@ -241,12 +286,17 @@
             }
         ],
         "wind": {
-            "speed": 5.83
+            "speed": 6.8
         },
-        "visibility": 9358,
+        "visibility": 9029,
         "sys": {
             "country": "CA"
         },
-        "fetch_timestamp": "2026-05-17T13:21:33.546589"
+        "aqi": 26,
+        "pm2_5": 6.44,
+        "pm10": 8.74,
+        "forecast_wind_speed": 9.61,
+        "forecast_humidity": 64,
+        "fetch_timestamp": "2026-05-17T14:17:54.881807"
     }
 ]
