@@ -1,0 +1,22 @@
+# ===================================
+# ETL Pipeline — Python Dependencies
+# ===================================
+# Install with: pip install -r requirements.txt
+
+# HTTP requests to OpenWeather API
+requests>=2.31.0
+
+# Data manipulation and CSV handling
+pandas>=2.0.0
+
+# MySQL database connector
+mysql-connector-python>=8.0.0
+
+# Streamlit dashboard (optional)
+streamlit>=1.30.0
+
+# Charts for the dashboard
+plotly>=5.18.0
+
+# Scheduling automation (optional)
+schedule>=1.2.0
