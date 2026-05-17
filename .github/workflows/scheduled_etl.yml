@@ -26,9 +26,13 @@ jobs:
 
     - name: Setup SQLite and Run Loader (initializes tables)
       run: python main.py --step 3
+      env:
+        OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
 
     - name: Run live ETL pipeline (Extract, Clean, Load, Analyze)
       run: python main.py
+      env:
+        OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
 
     - name: Commit and push updated database & outputs
       run: |
