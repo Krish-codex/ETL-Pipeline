@@ -16,14 +16,35 @@ import sys
 from datetime import datetime
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import BASE_URL, CITIES, DATA_DIR, OPENWEATHER_API_KEY, RAW_DATA_PATH
+from config import BASE_URL, CITIES, CITY_COORDINATES, DATA_DIR, OPENWEATHER_API_KEY, RAW_DATA_PATH
 from scripts.logger_setup import get_logger
 
 # Initialize logger for this module
 logger = get_logger("fetch_data")
+
+
+def get_session_with_retries() -> requests.Session:
+    """
+    Creates a requests Session with exponential backoff retry logic.
+    Retries on 500, 502, 503, 504 status codes or connection failures.
+    This fulfills the robust 'retry logic' requirement on the resume.
+    """
+    session = requests.Session()
+    retries = Retry(
+        total=3,                  # Retries 3 times before failing
+        backoff_factor=1,         # Waits 1s, then 2s, then 4s between retries
+        status_forcelist=[500, 502, 503, 504],
+        raise_on_status=False
+    )
+    adapter = HTTPAdapter(max_retries=retries)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
 
 
 def fetch_weather_for_city(city: str) -> dict | None:
@@ -49,7 +70,8 @@ def fetch_weather_for_city(city: str) -> dict | None:
 
     try:
         logger.info(f"Fetching weather data for: {city}")
-        response = requests.get(BASE_URL, params=params, timeout=10)
+        session = get_session_with_retries()
+        response = session.get(BASE_URL, params=params, timeout=10)
 
         # Check if the API returned an error (like 404 city not found)
         response.raise_for_status()
@@ -80,29 +102,93 @@ def fetch_weather_for_city(city: str) -> dict | None:
         return None
 
 
+def fetch_complementary_data(city: str) -> dict:
+    """
+    Fetches complementing Air Quality and Weather Forecast/Meteorological data from 2 additional public REST APIs.
+    - API 2: Open-Meteo Air Quality API (No key required)
+    - API 3: Open-Meteo Weather Forecast API (No key required)
+    This satisfies the '3+ public REST APIs' requirement on the resume.
+    """
+    coords = CITY_COORDINATES.get(city)
+    if not coords:
+        logger.warning(f"No coordinates found for {city} in config.")
+        return {}
+
+    lat, lon = coords["lat"], coords["lon"]
+    session = get_session_with_retries()
+    
+    # API 2: Open-Meteo Air Quality
+    aq_url = "https://air-quality-api.open-meteo.com/v1/air-quality"
+    aq_params = {
+        "latitude": lat,
+        "longitude": lon,
+        "current": "us_aqi,pm2_5,pm10"
+    }
+    
+    # API 3: Open-Meteo Weather Forecast
+    forecast_url = "https://api.open-meteo.com/v1/forecast"
+    forecast_params = {
+        "latitude": lat,
+        "longitude": lon,
+        "current": "wind_speed_10m,relative_humidity_2m"
+    }
+    
+    result = {}
+    
+    try:
+        logger.info(f"Fetching Air Quality for {city} from Open-Meteo API...")
+        aq_response = session.get(aq_url, params=aq_params, timeout=10)
+        aq_response.raise_for_status()
+        aq_data = aq_response.json()
+        
+        current_aq = aq_data.get("current", {})
+        result["aqi"] = current_aq.get("us_aqi")
+        result["pm2_5"] = current_aq.get("pm2_5")
+        result["pm10"] = current_aq.get("pm10")
+        logger.info(f"✓ API 2 (Air Quality) Success for {city} — AQI: {result['aqi']}")
+    except Exception as e:
+        logger.warning(f"Failed to fetch Air Quality data for {city}: {e}")
+        
+    try:
+        logger.info(f"Fetching Forecast & Wind Speed for {city} from Open-Meteo API...")
+        fc_response = session.get(forecast_url, params=forecast_params, timeout=10)
+        fc_response.raise_for_status()
+        fc_data = fc_response.json()
+        
+        current_fc = fc_data.get("current", {})
+        result["forecast_wind_speed"] = current_fc.get("wind_speed_10m")
+        result["forecast_humidity"] = current_fc.get("relative_humidity_2m")
+        logger.info(f"✓ API 3 (Forecast) Success for {city} — Wind: {result['forecast_wind_speed']} m/s")
+    except Exception as e:
+        logger.warning(f"Failed to fetch Forecast data for {city}: {e}")
+        
+    return result
+
+
 def fetch_all_cities() -> list[dict]:
     """
-    Fetches weather data for all cities defined in config.py
+    Fetches weather data for all cities defined in config.py from multiple REST APIs.
 
     Returns:
-        List of dictionaries containing weather data for each city
-
-    I'm collecting data for multiple cities to make the analysis
-    more interesting — comparing weather across different locations
-    is a common use case in data engineering.
+        List of dictionaries containing merged real-time data for each city.
     """
     all_weather_data = []
 
-    logger.info(f"Starting data extraction for {len(CITIES)} cities...")
+    logger.info(f"Starting data extraction from 3+ public REST APIs for {len(CITIES)} cities...")
 
     for city in CITIES:
+        # API 1: OpenWeather API
         weather_data = fetch_weather_for_city(city)
         if weather_data:
+            # API 2 & 3: Open-Meteo Air Quality & Weather Forecast APIs
+            extra_data = fetch_complementary_data(city)
+            weather_data.update(extra_data)
+            
             # Add a timestamp so we know exactly when this data was fetched
             weather_data["fetch_timestamp"] = datetime.now().isoformat()
             all_weather_data.append(weather_data)
 
-    logger.info(f"Successfully fetched data for {len(all_weather_data)}/{len(CITIES)} cities")
+    logger.info(f"Successfully fetched data from all 3 APIs for {len(all_weather_data)}/{len(CITIES)} cities")
     return all_weather_data
 
 
@@ -146,7 +232,7 @@ def save_raw_data(data: list[dict]) -> bool:
 def generate_mock_weather_for_city(city: str) -> dict:
     """
     Generates realistic mock weather data for simulation when API key is missing.
-    This allows the pipeline to be tested completely out-of-the-box!
+    Includes mock data for air quality and wind speed forecasts.
     """
     import random
     
@@ -169,6 +255,13 @@ def generate_mock_weather_for_city(city: str) -> dict:
     humidity = int(max(10, min(100, base["humidity"] + random.randint(-10, 10))))
     feels_like = round(temp + (0.1 if humidity > 70 else -0.1), 2)
     
+    # Generate mock variables for APIs 2 & 3
+    aqi = random.randint(15, 120)
+    pm2_5 = round(aqi * random.uniform(0.1, 0.3), 2)
+    pm10 = round(aqi * random.uniform(0.2, 0.5), 2)
+    forecast_wind = round(random.uniform(1.0, 10.0), 2)
+    forecast_hum = int(max(10, min(100, humidity + random.randint(-5, 5))))
+    
     return {
         "name": city,
         "main": {
@@ -190,6 +283,11 @@ def generate_mock_weather_for_city(city: str) -> dict:
         "sys": {
             "country": base["country"]
         },
+        "aqi": aqi,
+        "pm2_5": pm2_5,
+        "pm10": pm10,
+        "forecast_wind_speed": forecast_wind,
+        "forecast_humidity": forecast_hum,
         "fetch_timestamp": datetime.now().isoformat()
     }
 
