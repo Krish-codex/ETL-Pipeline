@@ -93,7 +93,7 @@ def get_sqlite_connection():
 
 def create_database_and_table() -> bool:
     """
-    Creates database and table. Supports both MySQL and SQLite.
+    Creates database and tables. Supports both MySQL and SQLite with normalized schema.
     """
     global USE_SQLITE
     
@@ -109,7 +109,7 @@ def create_database_and_table() -> bool:
                 cursor.execute("CREATE DATABASE IF NOT EXISTS weather_pipeline")
                 cursor.execute("USE weather_pipeline")
                 
-                # Load from sql file
+                # Load DDL from DDL SQL file
                 sql_file_path = os.path.join(SQL_DIR, "create_table.sql")
                 if os.path.exists(sql_file_path):
                     with open(sql_file_path, "r", encoding="utf-8") as f:
@@ -120,7 +120,7 @@ def create_database_and_table() -> bool:
                         statement = statement.strip()
                         if statement:
                             cursor.execute(statement)
-                    logger.info("MySQL table setup complete via SQL DDL script.")
+                    logger.info("MySQL normalized schema setup complete via SQL DDL script.")
                 connection.commit()
                 cursor.close()
                 connection.close()
@@ -145,11 +145,21 @@ def create_database_and_table() -> bool:
         
         try:
             cursor = connection.cursor()
-            # SQLite compatible table structure
-            create_table_query = """
-            CREATE TABLE IF NOT EXISTS weather_data (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                city TEXT NOT NULL,
+            
+            # SQLite Dimension table
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS dim_cities (
+                city_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                city_name TEXT UNIQUE NOT NULL,
+                country TEXT NOT NULL
+            )
+            """)
+            
+            # SQLite Fact table
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS fact_weather_measurements (
+                measurement_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                city_id INTEGER,
                 temperature REAL,
                 feels_like REAL,
                 temp_min REAL,
@@ -160,26 +170,33 @@ def create_database_and_table() -> bool:
                 weather_description TEXT,
                 wind_speed REAL,
                 visibility INTEGER,
-                country TEXT,
+                aqi INTEGER,
+                pm2_5 REAL,
+                pm10 REAL,
+                forecast_wind_speed REAL,
+                forecast_humidity INTEGER,
                 temp_category TEXT,
                 timestamp TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (city_id) REFERENCES dim_cities(city_id),
+                UNIQUE(city_id, timestamp)
             )
-            """
-            cursor.execute(create_table_query)
+            """)
+            
             connection.commit()
             cursor.close()
             connection.close()
-            logger.info("SQLite table setup complete successfully! ✓")
+            logger.info("SQLite normalized tables setup complete successfully! ✓")
             return True
         except sqlite3.Error as e:
-            logger.error(f"SQLite setup error: {e}")
+            logger.error(f"SQLite DDL setup error: {e}")
             return False
 
 
 def load_csv_to_db() -> bool:
     """
-    Reads the cleaned CSV and inserts it into the database (MySQL or SQLite).
+    Reads the cleaned CSV and performs incremental inserts into dim_cities and fact_weather_measurements.
+    Handles both MySQL and SQLite.
     """
     global USE_SQLITE
 
@@ -196,90 +213,127 @@ def load_csv_to_db() -> bool:
             return False
 
         if not USE_SQLITE:
-            # MySQL loading flow
+            # ========================
+            # MySQL INCREMENTAL LOAD
+            # ========================
             connection = get_mysql_connection(use_database=True)
             if not connection:
                 logger.error("Could not connect to MySQL database.")
                 return False
             
             cursor = connection.cursor()
-            cursor.execute("DELETE FROM weather_data")
             
-            insert_query = """
-            INSERT INTO weather_data 
-                (city, temperature, feels_like, temp_min, temp_max,
+            # 1. Insert cities into dim_cities
+            city_insert_query = "INSERT IGNORE INTO dim_cities (city_name, country) VALUES (%s, %s)"
+            city_records = [(row["city"], row["country"]) for _, row in df.iterrows()]
+            cursor.executemany(city_insert_query, city_records)
+            connection.commit()
+            
+            # 2. Retrieve city name to ID mappings
+            cursor.execute("SELECT city_id, city_name FROM dim_cities")
+            city_map = {name: cid for cid, name in cursor.fetchall()}
+            
+            # 3. Insert measurements into fact table incrementally
+            fact_insert_query = """
+            INSERT IGNORE INTO fact_weather_measurements 
+                (city_id, temperature, feels_like, temp_min, temp_max,
                  humidity, pressure, weather_condition, weather_description,
-                 wind_speed, visibility, country, temp_category, timestamp)
+                 wind_speed, visibility, aqi, pm2_5, pm10, 
+                 forecast_wind_speed, forecast_humidity, temp_category, timestamp)
             VALUES 
-                (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             
             records = []
             for _, row in df.iterrows():
+                city_name = row.get("city")
+                city_id = city_map.get(city_name)
+                
                 record = tuple(
                     None if pd.isna(val) else val
                     for val in [
-                        row.get("city"), row.get("temperature"), row.get("feels_like"),
+                        city_id, row.get("temperature"), row.get("feels_like"),
                         row.get("temp_min"), row.get("temp_max"), row.get("humidity"),
                         row.get("pressure"), row.get("weather_condition"),
                         row.get("weather_description"), row.get("wind_speed"),
-                        row.get("visibility"), row.get("country"),
-                        row.get("temp_category"), row.get("timestamp")
+                        row.get("visibility"), row.get("aqi"), row.get("pm2_5"),
+                        row.get("pm10"), row.get("forecast_wind_speed"),
+                        row.get("forecast_humidity"), row.get("temp_category"),
+                        row.get("timestamp")
                     ]
                 )
                 records.append(record)
 
-            cursor.executemany(insert_query, records)
+            cursor.executemany(fact_insert_query, records)
             connection.commit()
-            logger.info(f"Loaded {cursor.rowcount} records into MySQL database successfully!")
+            
+            logger.info(f"Successfully processed {len(records)} measurements into MySQL (Inserted: {cursor.rowcount} new rows).")
             cursor.close()
             connection.close()
             return True
 
         else:
-            # SQLite loading flow
+            # ========================
+            # SQLite INCREMENTAL LOAD
+            # ========================
             connection = get_sqlite_connection()
             if not connection:
                 logger.error("Could not connect to SQLite database.")
                 return False
             
             cursor = connection.cursor()
-            cursor.execute("DELETE FROM weather_data")
             
-            # SQLite uses ? placeholders instead of %s
-            insert_query = """
-            INSERT INTO weather_data 
-                (city, temperature, feels_like, temp_min, temp_max,
+            # 1. Insert cities into dim_cities
+            city_insert_query = "INSERT OR IGNORE INTO dim_cities (city_name, country) VALUES (?, ?)"
+            city_records = [(row["city"], row["country"]) for _, row in df.iterrows()]
+            cursor.executemany(city_insert_query, city_records)
+            connection.commit()
+            
+            # 2. Retrieve city mappings
+            cursor.execute("SELECT city_id, city_name FROM dim_cities")
+            city_map = {name: cid for cid, name in cursor.fetchall()}
+            
+            # 3. Insert measurements
+            fact_insert_query = """
+            INSERT OR IGNORE INTO fact_weather_measurements 
+                (city_id, temperature, feels_like, temp_min, temp_max,
                  humidity, pressure, weather_condition, weather_description,
-                 wind_speed, visibility, country, temp_category, timestamp)
+                 wind_speed, visibility, aqi, pm2_5, pm10, 
+                 forecast_wind_speed, forecast_humidity, temp_category, timestamp)
             VALUES 
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
             
             records = []
             for _, row in df.iterrows():
+                city_name = row.get("city")
+                city_id = city_map.get(city_name)
+                
                 record = tuple(
                     None if pd.isna(val) else val
                     for val in [
-                        row.get("city"), row.get("temperature"), row.get("feels_like"),
+                        city_id, row.get("temperature"), row.get("feels_like"),
                         row.get("temp_min"), row.get("temp_max"), row.get("humidity"),
                         row.get("pressure"), row.get("weather_condition"),
                         row.get("weather_description"), row.get("wind_speed"),
-                        row.get("visibility"), row.get("country"),
-                        row.get("temp_category"), row.get("timestamp")
+                        row.get("visibility"), row.get("aqi"), row.get("pm2_5"),
+                        row.get("pm10"), row.get("forecast_wind_speed"),
+                        row.get("forecast_humidity"), row.get("temp_category"),
+                        row.get("timestamp")
                     ]
                 )
                 records.append(record)
 
-            cursor.executemany(insert_query, records)
+            cursor.executemany(fact_insert_query, records)
             connection.commit()
-            logger.info(f"Loaded {len(records)} records into SQLite database successfully! ✓")
+            
+            logger.info(f"Successfully processed {len(records)} measurements into SQLite (Inserted/Updated rows). ✓")
             cursor.close()
             connection.close()
             return True
 
     except Exception as e:
-        logger.error(f"Error during loading step: {e}")
+        logger.error(f"Error during incremental loading step: {e}")
         return False
 
 
