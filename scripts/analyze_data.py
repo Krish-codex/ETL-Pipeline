@@ -32,54 +32,73 @@ from scripts.logger_setup import get_logger
 # Initialize logger for this module
 logger = get_logger("analyze_data")
 
-# ==============================
-# SQL ANALYSIS QUERIES (MySQL)
-# ==============================
-MYSQL_QUERIES = [
+# ==========================================
+# SQL ANALYSIS QUERIES (JOINs & Windows)
+# ==========================================
+# A single unified query suite that runs flawlessly on both MySQL and SQLite.
+# This implements advanced SQL JOINs, GROUP BYs, and Window Functions.
+QUERIES = [
     (
-        "Average Temperature by City",
+        "Average Temperature, Humidity & Air Quality by City (JOIN & GROUP BY)",
         """
-        SELECT city, 
-               ROUND(AVG(temperature), 2) AS avg_temp,
-               ROUND(MIN(temperature), 2) AS min_temp,
-               ROUND(MAX(temperature), 2) AS max_temp
-        FROM weather_data
-        GROUP BY city
+        SELECT c.city_name, c.country,
+               ROUND(AVG(w.temperature), 2) AS avg_temp,
+               ROUND(AVG(w.humidity), 2) AS avg_humidity,
+               ROUND(AVG(w.aqi), 2) AS avg_aqi
+        FROM fact_weather_measurements w
+        INNER JOIN dim_cities c ON w.city_id = c.city_id
+        GROUP BY c.city_id, c.city_name, c.country
         ORDER BY avg_temp DESC
         """,
-        ["City", "Avg Temp (°C)", "Min Temp (°C)", "Max Temp (°C)"],
+        ["City", "Country", "Avg Temp (°C)", "Avg Humidity (%)", "Avg AQI"],
     ),
     (
-        "Average Humidity by City",
+        "Rank Cities by Wind Speed in Each Country (Window Function RANK & JOIN)",
         """
-        SELECT city,
-               ROUND(AVG(humidity), 2) AS avg_humidity
-        FROM weather_data
-        GROUP BY city
-        ORDER BY avg_humidity DESC
+        SELECT city_name, country, wind_speed, wind_rank FROM (
+            SELECT c.city_name, c.country, w.wind_speed,
+                   RANK() OVER (PARTITION BY c.country ORDER BY w.wind_speed DESC) as wind_rank
+            FROM fact_weather_measurements w
+            INNER JOIN dim_cities c ON w.city_id = c.city_id
+        ) t
+        ORDER BY country, wind_rank
         """,
-        ["City", "Avg Humidity (%)"],
+        ["City", "Country", "Wind Speed (m/s)", "Rank in Country"],
     ),
     (
-        "Most Common Weather Conditions",
+        "Compare Temperature against City Average and Deviation (Window Function & JOIN)",
         """
-        SELECT weather_condition,
+        SELECT c.city_name, w.temperature, w.timestamp,
+               ROUND(AVG(w.temperature) OVER(PARTITION BY c.city_name), 2) AS city_avg,
+               ROUND(w.temperature - AVG(w.temperature) OVER(PARTITION BY c.city_name), 2) AS temp_deviation
+        FROM fact_weather_measurements w
+        INNER JOIN dim_cities c ON w.city_id = c.city_id
+        ORDER BY w.timestamp DESC
+        LIMIT 10
+        """,
+        ["City", "Current Temp (°C)", "Timestamp", "City Avg Temp", "Deviation"],
+    ),
+    (
+        "Most Common Weather Conditions (JOIN & GROUP BY)",
+        """
+        SELECT w.weather_condition,
                COUNT(*) AS occurrence_count,
-               GROUP_CONCAT(DISTINCT city ORDER BY city SEPARATOR ', ') AS cities
-        FROM weather_data
-        GROUP BY weather_condition
+               GROUP_CONCAT(c.city_name) AS cities
+        FROM fact_weather_measurements w
+        INNER JOIN dim_cities c ON w.city_id = c.city_id
+        GROUP BY w.weather_condition
         ORDER BY occurrence_count DESC
         """,
         ["Weather Condition", "Count", "Cities"],
     ),
     (
-        "Temperature Categories Distribution",
+        "Temperature Categories Distribution (GROUP BY & COUNT)",
         """
         SELECT temp_category,
                COUNT(*) AS city_count,
                ROUND(AVG(temperature), 2) AS avg_temp,
                ROUND(AVG(humidity), 2) AS avg_humidity
-        FROM weather_data
+        FROM fact_weather_measurements
         WHERE temp_category IS NOT NULL
         GROUP BY temp_category
         ORDER BY avg_temp DESC
@@ -87,158 +106,30 @@ MYSQL_QUERIES = [
         ["Category", "City Count", "Avg Temp (°C)", "Avg Humidity (%)"],
     ),
     (
-        "Hottest and Coldest Cities",
+        "Top Windiest and Polluted Cities (JOIN & Window Function DENSE_RANK)",
         """
-        (SELECT city, temperature, humidity, weather_condition, 'Hottest' AS label
-         FROM weather_data
-         ORDER BY temperature DESC LIMIT 3)
-        UNION ALL
-        (SELECT city, temperature, humidity, weather_condition, 'Coldest' AS label
-         FROM weather_data
-         ORDER BY temperature ASC LIMIT 3)
+        SELECT city_name, country, aqi, aqi_rank FROM (
+            SELECT c.city_name, c.country, w.aqi,
+                   DENSE_RANK() OVER (ORDER BY w.aqi DESC) AS aqi_rank
+            FROM fact_weather_measurements w
+            INNER JOIN dim_cities c ON w.city_id = c.city_id
+        ) t
+        WHERE t.aqi_rank <= 5
         """,
-        ["City", "Temp (°C)", "Humidity (%)", "Weather", "Label"],
+        ["City", "Country", "AQI", "Global AQI Rank"],
     ),
     (
-        "Cities with High Wind Speed",
-        """
-        SELECT city, wind_speed, weather_condition, temperature
-        FROM weather_data
-        WHERE wind_speed IS NOT NULL
-        ORDER BY wind_speed DESC
-        LIMIT 5
-        """,
-        ["City", "Wind Speed (m/s)", "Weather", "Temp (°C)"],
-    ),
-    (
-        "Weather Summary Statistics",
+        "Weather Summary Statistics (Aggregations on Fact Table)",
         """
         SELECT 
             COUNT(*) AS total_records,
-            COUNT(DISTINCT city) AS unique_cities,
+            COUNT(DISTINCT city_id) AS unique_cities,
             ROUND(AVG(temperature), 2) AS overall_avg_temp,
             ROUND(AVG(humidity), 2) AS overall_avg_humidity,
-            ROUND(AVG(wind_speed), 2) AS overall_avg_wind
-        FROM weather_data
+            ROUND(AVG(aqi), 2) AS overall_avg_aqi
+        FROM fact_weather_measurements
         """,
-        ["Total Records", "Unique Cities", "Avg Temp (°C)", "Avg Humidity (%)", "Avg Wind (m/s)"],
-    ),
-    (
-        "Country-wise Weather Overview",
-        """
-        SELECT country,
-               COUNT(*) AS city_count,
-               ROUND(AVG(temperature), 2) AS avg_temp,
-               ROUND(AVG(humidity), 2) AS avg_humidity
-        FROM weather_data
-        GROUP BY country
-        ORDER BY city_count DESC, avg_temp DESC
-        """,
-        ["Country", "Cities", "Avg Temp (°C)", "Avg Humidity (%)"],
-    ),
-]
-
-# ===============================
-# SQL ANALYSIS QUERIES (SQLite)
-# ===============================
-# We customize some query syntax because SQLite doesn't support features
-# like GROUP_CONCAT with SEPARATOR or direct parentheses in UNIONs with LIMIT.
-SQLITE_QUERIES = [
-    (
-        "Average Temperature by City",
-        """
-        SELECT city, 
-               ROUND(AVG(temperature), 2) AS avg_temp,
-               ROUND(MIN(temperature), 2) AS min_temp,
-               ROUND(MAX(temperature), 2) AS max_temp
-        FROM weather_data
-        GROUP BY city
-        ORDER BY avg_temp DESC
-        """,
-        ["City", "Avg Temp (°C)", "Min Temp (°C)", "Max Temp (°C)"],
-    ),
-    (
-        "Average Humidity by City",
-        """
-        SELECT city,
-               ROUND(AVG(humidity), 2) AS avg_humidity
-        FROM weather_data
-        GROUP BY city
-        ORDER BY avg_humidity DESC
-        """,
-        ["City", "Avg Humidity (%)"],
-    ),
-    (
-        "Most Common Weather Conditions",
-        """
-        SELECT weather_condition,
-               COUNT(*) AS occurrence_count,
-               GROUP_CONCAT(DISTINCT city) AS cities
-        FROM weather_data
-        GROUP BY weather_condition
-        ORDER BY occurrence_count DESC
-        """,
-        ["Weather Condition", "Count", "Cities"],
-    ),
-    (
-        "Temperature Categories Distribution",
-        """
-        SELECT temp_category,
-               COUNT(*) AS city_count,
-               ROUND(AVG(temperature), 2) AS avg_temp,
-               ROUND(AVG(humidity), 2) AS avg_humidity
-        FROM weather_data
-        WHERE temp_category IS NOT NULL
-        GROUP BY temp_category
-        ORDER BY avg_temp DESC
-        """,
-        ["Category", "City Count", "Avg Temp (°C)", "Avg Humidity (%)"],
-    ),
-    (
-        "Hottest and Coldest Cities",
-        """
-        SELECT * FROM (SELECT city, temperature, humidity, weather_condition, 'Hottest' AS label FROM weather_data ORDER BY temperature DESC LIMIT 3)
-        UNION ALL
-        SELECT * FROM (SELECT city, temperature, humidity, weather_condition, 'Coldest' AS label FROM weather_data ORDER BY temperature ASC LIMIT 3)
-        """,
-        ["City", "Temp (°C)", "Humidity (%)", "Weather", "Label"],
-    ),
-    (
-        "Cities with High Wind Speed",
-        """
-        SELECT city, wind_speed, weather_condition, temperature
-        FROM weather_data
-        WHERE wind_speed IS NOT NULL
-        ORDER BY wind_speed DESC
-        LIMIT 5
-        """,
-        ["City", "Wind Speed (m/s)", "Weather", "Temp (°C)"],
-    ),
-    (
-        "Weather Summary Statistics",
-        """
-        SELECT 
-            COUNT(*) AS total_records,
-            COUNT(DISTINCT city) AS unique_cities,
-            ROUND(AVG(temperature), 2) AS overall_avg_temp,
-            ROUND(AVG(humidity), 2) AS overall_avg_humidity,
-            ROUND(AVG(wind_speed), 2) AS overall_avg_wind
-        FROM weather_data
-        """,
-        ["Total Records", "Unique Cities", "Avg Temp (°C)", "Avg Humidity (%)", "Avg Wind (m/s)"],
-    ),
-    (
-        "Country-wise Weather Overview",
-        """
-        SELECT country,
-               COUNT(*) AS city_count,
-               ROUND(AVG(temperature), 2) AS avg_temp,
-               ROUND(AVG(humidity), 2) AS avg_humidity
-        FROM weather_data
-        GROUP BY country
-        ORDER BY city_count DESC, avg_temp DESC
-        """,
-        ["Country", "Cities", "Avg Temp (°C)", "Avg Humidity (%)"],
+        ["Total Records", "Unique Cities", "Avg Temp (°C)", "Avg Humidity (%)", "Avg AQI"],
     ),
 ]
 
@@ -311,9 +202,9 @@ def run_analysis_queries() -> tuple[str, str]:
             config["use_pure"] = True      # Avoid C-extension DLL conflicts on Windows
             connection = mysql.connector.connect(**config)
             cursor = connection.cursor()
-            logger.info(f"Running {len(MYSQL_QUERIES)} analysis queries...")
+            logger.info(f"Running {len(QUERIES)} analysis queries...")
 
-            for title, query, headers in MYSQL_QUERIES:
+            for title, query, headers in QUERIES:
                 try:
                     cursor.execute(query)
                     rows = cursor.fetchall()
@@ -342,9 +233,9 @@ def run_analysis_queries() -> tuple[str, str]:
         try:
             connection = sqlite3.connect(SQLITE_DB_PATH)
             cursor = connection.cursor()
-            logger.info(f"Running {len(SQLITE_QUERIES)} analysis queries...")
+            logger.info(f"Running {len(QUERIES)} analysis queries...")
 
-            for title, query, headers in SQLITE_QUERIES:
+            for title, query, headers in QUERIES:
                 try:
                     cursor.execute(query)
                     rows = cursor.fetchall()
